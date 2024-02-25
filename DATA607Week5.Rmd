@@ -1,0 +1,146 @@
+---
+title: "Week 5 - Tidying and Transforming Data"
+author: "Puja Roy"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+### Introduction
+For this assignment, I had to create a CSV file that describes arrival delays for two airlines: ALASKA & AM WEST across five destination: Los Angeles, Phoenix, San Diego, San Francisco and Seattle. The main objective is to perform analysis to compare the arrival delays for the two airlines.
+
+### Load R Library packages
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+### Retrieve the untidy data from GitHub
+
+Once I imported the libraries required, I retrieved the raw dataset from the URL of my GitHub profile in which I stored the dataset.
+```{r}
+flights_data <- read.csv("https://raw.githubusercontent.com/pujaroy280/DATA607Week5/main/Flight_data.txt")
+View(flights_data)
+print(flights_data)
+```
+### Clean, Transform and Tidy the Data
+
+Initially, the data was messy and difficult to interpret which is why I removed the NA values. I noticed that the Airline Names for the delayed portion of the data were missing which is why I filled in the missing values for row 2 and 4 of the first column in Air_Service. I also renamed the destination names to be more consistent.
+```{r}
+# Remove rows with NA values
+flights_data <- flights_data[complete.cases(flights_data), ]
+```
+
+```{r}
+# Fill in missing values in the first column
+flights_data[2, "x"] <- "ALASKA"
+flights_data[4, "x"] <- "AM WEST"
+```
+
+```{r}
+flights_data <- flights_data %>%
+  rename(
+    Air_Service="x",
+    Travel_Status="y",
+    Los_Angeles = "Los.Angeles",
+    Phoenix = "Phoenix",
+    San_Diego = "San.Diego",
+    San_Francisco = "San.Francisco",
+    Seattle = "Seattle"
+  )
+view(flights_data)
+print(flights_data)
+```
+
+After that, I reshaped the data to store the destination names into a column named City.
+```{r}
+# Reshape data to long format
+flights_data_long <- flights_data %>%
+  pivot_longer(cols = -c(Air_Service, Travel_Status), names_to = "City", values_to = "Count")
+print(flights_data_long)
+```
+Since the data still looked messy, I decided to split the Travel_Status column into 2 columns that consisted of count values for the On_time and Delayed flights. This condensed the dataset from 20 observations to 10 observations of 4 variables. 
+```{r}
+# Reshape data to long format
+New_flights_data_long <- flights_data %>%
+  pivot_longer(cols = -c(Air_Service, Travel_Status), names_to = "City", values_to = "Count") %>%
+  separate(Travel_Status, into = c("Status", "Delay_Status"), sep = " ") %>%
+  mutate(Status = if_else(Status == "on", "On_time", "Delayed")) %>%
+  select(-Delay_Status) %>%
+  pivot_wider(names_from = Status, values_from = Count)
+
+# Print the first few rows of the resulting dataframe
+print(New_flights_data_long)
+
+```
+### Visualize Delayed Flights
+
+Since the data is now clean and easier to analyze, it's time to visualize the number of delayed flights for each Airline. I utilized the RColorBrewer library to identify the type of color palette that I wanted to apply.
+```{r}
+# Load necessary libraries
+library(RColorBrewer)
+
+# Define custom colors from the Paired palette
+custom_colors <- brewer.pal(8, "Paired")[c(1, 2)] # Selecting the 1st and 2nd colors from the Paired Palette which consists of 8 colors
+
+# Create the ggplot visualization
+flight_data_viz <- ggplot(data = New_flights_data_long, aes(x = City, y = Delayed, fill = Air_Service)) +
+  ggtitle('Delayed Flights') +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_text(aes(label = Delayed), vjust = -0.2, position = position_dodge(0.9), size = 3.5) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = custom_colors)  # Set custom colors from the Paired palette
+
+# Print the plot
+print(flight_data_viz)
+
+```
+
+The Delayed Flights visualization displays that AM WEST had the highest number of delays at Phoenix and ALASKA had the highest number of delays at Seattle. On the other hand, AM WEST had the lowest number of delays at Seattle and ALASKA had the lowest number of delays at Phoenix.
+
+### Visualize On time Flights
+
+I decided to explore and visualize the number of On time flights for each Airline.
+```{r}
+# Load necessary libraries
+library(RColorBrewer)
+
+# Define custom colors from the Paired palette
+custom_colors <- brewer.pal(8, "Paired")[c(3, 4)] # Selecting the 3rd and 4th colors from the Paired Palette which consists of 8 colors
+
+# Create the ggplot visualization
+flight_data_viz2 <- ggplot(data = New_flights_data_long, aes(x = City, y = On_time, fill = Air_Service)) +
+  ggtitle('On Time Flights') +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_text(aes(label = On_time), vjust = -0.2, position = position_dodge(0.9), size = 3.5) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = custom_colors)  # Set custom colors from the Paired palette
+
+# Print the plot
+print(flight_data_viz2)
+```
+
+ALASKA flights had the highest number of on time flights at Seattle, whereas AM WEST had the highest number of on time flights at Phoenix.
+
+### Calculate Delay Percentage
+```{r}
+# Group by Air_Service and calculate delay percentage
+Delay_percentage <- New_flights_data_long %>%
+  group_by(Air_Service) %>%
+  # Calculate percentage of delayed flights within each group
+  mutate(percent = Delayed / sum(Delayed, On_time)) %>%
+  # Summarize to get total delay percentage for each Air_Service
+  summarise(delay_percentage = sum(percent))
+
+print(Delay_percentage)
+```
+
+### Conclusion
+
+Overall, the visualizations proved that the airline service AM WEST had more delays for each destination and had the lowest delays at Seattle. I calculated the delay percentage by grouping the Air_Service to obtain the total delay percentage for each Airline. ALASKA flights are delayed by 13% and AM WEST flights are delayed by 11%.
+
+
